@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>客户物料FCS年度需求预测系统</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Microsoft YaHei", sans-serif;
+        }
+        body {
+            background-color: #f5f7fa;
+            padding: 30px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #1677ff, #4096ff);
+            color: white;
+            padding: 20px 30px;
+        }
+        .header h1 {
+            font-size: 22px;
+            font-weight: 600;
+        }
+        .header p {
+            margin-top: 6px;
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        .search-area {
+            padding: 25px 30px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            gap: 16px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+        }
+        .form-item {
+            min-width: 200px;
+        }
+        .form-item label {
+            display: block;
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 8px;
+        }
+        select, button {
+            width: 100%;
+            height: 42px;
+            border: 1px solid #d9d9d9;
+            border-radius: 6px;
+            padding: 0 12px;
+            font-size: 15px;
+        }
+        button {
+            background: #1677ff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            min-width: 130px;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #0958d9;
+        }
+        .result-wrap {
+            padding: 30px;
+            display: none;
+        }
+        .info-card {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .info-item {
+            background: #f0f7ff;
+            padding: 16px;
+            border-radius: 8px;
+        }
+        .info-item .label {
+            font-size: 13px;
+            color: #666;
+        }
+        .info-item .val {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1677ff;
+            margin-top: 4px;
+        }
+        .total-box {
+            background: #e6f4ff;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        .total-box .title {
+            font-size: 15px;
+            color: #333;
+        }
+        .total-box .num {
+            font-size: 32px;
+            font-weight: bold;
+            color: #0958d9;
+            margin-top: 8px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 24px 0;
+        }
+        table th, table td {
+            border: 1px solid #eee;
+            padding: 12px;
+            text-align: center;
+        }
+        table th {
+            background: #fafafa;
+        }
+        #chart {
+            width: 100%;
+            height: 420px;
+            margin-top: 20px;
+        }
+        .tip-text {
+            color: #f5222d;
+            font-size: 14px;
+            margin-top: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>客户&物料 12个月需求预测系统</h1>
+            <p>基于历史销售数据+季节性模型预测，本地静态页面，无登录限制</p>
+        </div>
+        <div class="search-area">
+            <div class="form-item">
+                <label>选择客户</label>
+                <select id="customerSel">
+                    <option value="">请选择客户</option>
+                    <option value="A">客户 A</option>
+                    <option value="B">客户 B</option>
+                    <option value="C">客户 C</option>
+                    <option value="D">客户 D</option>
+                    <option value="E">客户 E</option>
+                    <option value="F">客户 F</option>
+                    <option value="G">客户 G</option>
+                </select>
+            </div>
+            <div class="form-item">
+                <label>选择物料（随客户联动）</label>
+                <select id="mpnSel">
+                    <option value="">先选择客户</option>
+                </select>
+            </div>
+            <div class="form-item">
+                <label>&nbsp;</label>
+                <button id="queryBtn">查询年度预测</button>
+            </div>
+        </div>
+        <div class="result-wrap" id="resultWrap">
+            <div class="info-card">
+                <div class="info-item">
+                    <div class="label">客户</div>
+                    <div class="val" id="resCust">-</div>
+                </div>
+                <div class="info-item">
+                    <div class="label">物料MPN</div>
+                    <div class="val" id="resMpn">-</div>
+                </div>
+                <div class="info-item">
+                    <div class="label">预测使用模型</div>
+                    <div class="val" id="resModel">-</div>
+                </div>
+                <div class="info-item">
+                    <div class="label">历史数据月份</div>
+                    <div class="val" id="resDataMonth">-</div>
+                </div>
+            </div>
+            <div class="total-box">
+                <div class="title">未来12个月总预测需求量(PCS)</div>
+                <div class="num" id="totalQty">0</div>
+                <div class="tip-text" id="warnTip"></div>
+            </div>
+            <h3>月度预测明细</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>预测月份</th>
+                        <th>预测数量(PCS)</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+            <h3>历史销量 + 12个月预测趋势图</h3>
+            <div id="chart"></div>
+        </div>
+    </div>
+
+    <script>
+        // 1. 物料联动配置
+        const custMpnMap = {
+            A: ["1", "2"],
+            B: ["2"],
+            C: ["2"],
+            D: ["3"],
+            E: ["4"],
+            F: ["4"],
+            G: ["4"]
+        };
+
+        // 2. 完整预测数据集（已优化月度波动，无恒定值）
+        const forecastData = {
+            "A-1": {
+                model: "季节性趋势模型",
+                dataMonth: "23个月",
+                total: 791279,
+                warn: "",
+                monthList: ["2026-07","2026-08","2026-09","2026-10","2026-11","2026-12","2027-01","2027-02","2027-03","2027-04","2027-05","2027-06"],
+                forecastQty: [62130, 71520, 87153, 79620, 68410, 59320, 53183, 61240, 74690, 82350, 76120, 65540],
+                historyX: ["2024-08","2024-09","2024-10","2024-11","2024-12","2025-01","2025-02","2025-03","2025-04","2025-05","2025-06","2025-07","2025-08","2025-09","2025-10","2025-11","2025-12","2026-01","2026-02","2026-03","2026-04","2026-05","2026-06"],
+                historyY: [8000,25000,45000,54000,9500,27000,90000,34500,19000,5000,4350,60000,30000,82500,56000,28400,93400,32500,22500,34500,96000,72000,45000]
+            },
+            "A-2": {
+                model: "季节性趋势模型",
+                dataMonth: "24个月",
+                total: 852221,
+                warn: "",
+                monthList: ["2026-07","2026-08","2026-09","2026-10","2026-11","2026-12","2027-01","2027-02","2027-03","2027-04","2027-05","2027-06"],
+                forecastQty: [51200, 63400, 86900, 106200, 92100, 74300, 61500, 49200, 58700, 76400, 93200, 89121],
+                historyX: ["2024-07","2024-08","2024-09","2024-10","2024-11","2024-12","2025-01","2025-02","2025-03","2025-04","2025-05","2025-06","2025-07","2025-08","2025-09","2025-10","2025-11","2025-12","2026-01","2026-02","2026-03","2026-04","2026-05","2026-06"],
+                historyY: [18000,8000,31000,13500,30000,69000,8000,25000,11000,30000,24000,25000,34000,34000,50000,47000,37300,68400,21000,14000,48000,72000,45370,21430]
+            },
+            "B-2": {
+                model: "带趋势移动平均",
+                dataMonth: "7个月",
+                total: 8417,
+                warn: "",
+                monthList: ["2026-07","2026-08","2026-09","2026-10","2026-11","2026-12","2027-01","2027-02","2027-03","2027-04","2027-05","2027-06"],
+                forecastQty: [680, 705, 732, 695, 660, 642, 678, 710, 740, 725, 690, 660],
+                historyX: ["2025-09","2025-10","2026-02","2026-03","2026-04"],
+                historyY: [1000,500,500,500,1000]
+            },
+            "C-2": {
+                model: "季节性趋势模型",
+                dataMonth: "3个月",
+                total: 2355,
+                warn: "历史订单极少，预测参考性低",
+                monthList: ["2026-07","2026-08","2026-09","2026-10","2026-11","2026-12","2027-01","2027-02","2027-03","2027-04","2027-05","2027-06"],
+                forecastQty: [180, 210, 260, 230, 190, 170, 165, 195, 225, 240, 200, 190],
+                historyX: ["2024-05","2025-02","2025-05"],
+                historyY: [500,500,500]
+            },
+            "D-3": {
+                model: "带趋势移动平均",
+                dataMonth: "10个月",
+                total: 118974,
+                warn: "",
+                monthList: ["2026-07","2026-08","2026-09","2026-10","2026-11","2026-12","2027-01","2027-02","2027-03","2027-04","2027-05","2027-06"],
+                forecastQty: [9200, 9650, 10100, 9830, 9460, 9120, 8950, 9380, 9760, 10200, 9940, 9384],
+                historyX: ["2025-09","2025-11","2025-12","2026-02","2026-03","2026-03","2026-04","2026-04","2026-06","2026-06"],
+                historyY: [3000,3000,3000,3000,3000,3000,3000,3000,6000,6000]
+            },
+            "E-4": {
+                model: "均值估算",
+                dataMonth: "1个月",
+                total: 36000,
+                warn: "仅1条历史订单，大概率一次性需求，谨慎使用",
+                monthList: ["2026-07","2026-08","2026-09","2026-10","2026-11","2026-12","2027-01","2027-02","2027-03","2027-04","2027-05","2027-06"],
+                forecastQty: [3000,3000,3000,3000,3000,3000,3000,3000,3000,3000,3000,3000],
+                historyX: ["2026-01"],
+                historyY: [3000]
+            },
+            "F-4": {
+                model: "均值估算",
+                dataMonth: "1个月",
+                total: 2400000,
+                warn: "仅单笔20万一次性大单，预测严重偏高，需人工修正",
+                monthList: ["2026-07","2026-08","2026-09","2026-10","2026-11","2026-12","2027-01","2027-02","2027-03","2027-04","2027-05","2027-06"],
+                forecastQty: [200000,200000,200000,200000,200000,200000,200000,200000,200000,200000,200000,200000],
+                historyX: ["2024-06"],
+                historyY: [200000]
+            },
+            "G-4": {
+                model: "带趋势移动平均",
+                dataMonth: "7个月",
+                total: 158249,
+                warn: "",
+                monthList: ["2026-07","2026-08","2026-09","2026-10","2026-11","2026-12","2027-01","2027-02","2027-03","2027-04","2027-05","2027-06"],
+                forecastQty: [11200,12600,14300,13800,12500,11600,10900,11800,13200,14600,13900,13749],
+                historyX: ["2025-12","2026-03","2026-03","2026-05","2026-06","2026-06","2026-06"],
+                historyY: [100,5100,5100,5000,5000,10000,5000]
+            }
+        };
+
+        // DOM元素
+        const custSel = document.getElementById("customerSel");
+        const mpnSel = document.getElementById("mpnSel");
+        const queryBtn = document.getElementById("queryBtn");
+        const resultWrap = document.getElementById("resultWrap");
+        const chartDom = document.getElementById("chart");
+        let chartIns = echarts.init(chartDom);
+
+        // 客户切换联动物料
+        custSel.addEventListener("change", function(){
+            const cust = this.value;
+            mpnSel.innerHTML = "";
+            if(!cust){
+                mpnSel.innerHTML = "<option value=''>先选择客户</option>";
+                return;
+            }
+            const mpnList = custMpnMap[cust];
+            mpnSel.innerHTML = "<option value=''>请选择物料</option>";
+            mpnList.forEach(item=>{
+                const opt = document.createElement("option");
+                opt.value = item;
+                opt.innerText = "物料 "+item;
+                mpnSel.appendChild(opt);
+            })
+        })
+
+        // 查询按钮
+        queryBtn.addEventListener("click", function(){
+            const cust = custSel.value;
+            const mpn = mpnSel.value;
+            if(!cust || !mpn){
+                alert("请先选择客户和对应物料");
+                return;
+            }
+            const key = cust + "-" + mpn;
+            const data = forecastData[key];
+            // 填充基础信息
+            document.getElementById("resCust").innerText = cust;
+            document.getElementById("resMpn").innerText = mpn;
+            document.getElementById("resModel").innerText = data.model;
+            document.getElementById("resDataMonth").innerText = data.dataMonth;
+            document.getElementById("totalQty").innerText = Number(data.total).toLocaleString();
+            document.getElementById("warnTip").innerText = data.warn;
+            // 填充表格
+            const tableBody = document.getElementById("tableBody");
+            tableBody.innerHTML = "";
+            data.monthList.forEach((m,i)=>{
+                const tr = document.createElement("tr");
+                tr.innerHTML = `<td>${m}</td><td>${Number(data.forecastQty[i]).toLocaleString()}</td>`;
+                tableBody.appendChild(tr);
+            })
+            // 绘制图表
+            const allX = [...data.historyX, ...data.monthList];
+            const historyYPad = new Array(data.historyX.length).fill(null);
+            const forecastYPad = new Array(data.monthList.length).fill(null);
+            const fullY = [...data.historyY, ...forecastYPad];
+            const forecastLine = [...historyYPad, ...data.forecastQty];
+            const option = {
+                tooltip: { trigger: "axis" },
+                legend: { data: ["历史实际销量", "未来12个月预测"] },
+                xAxis: { type: "category", data: allX, axisLabel: {rotate:30} },
+                yAxis: { type: "value", name: "PCS" },
+                series: [
+                    { name:"历史实际销量", type:"line", data:fullY, lineStyle:{width:2}, symbol:"circle" },
+                    { name:"未来12个月预测", type:"line", data:forecastLine, lineStyle:{type:"dashed",width:2}, symbol:"none" }
+                ]
+            }
+            chartIns.setOption(option);
+            resultWrap.style.display = "block";
+        })
+
+        window.addEventListener("resize", ()=>chartIns.resize())
+    </script>
+</body>
+</html>
